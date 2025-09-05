@@ -5,6 +5,7 @@ import hashlib
 from datetime import datetime
 import io
 
+# --- Web3/GenZ UI Styles ---
 primary = "#8323FF"
 safe = "#2ED47A"
 danger = "#D7263D"
@@ -33,7 +34,7 @@ st.markdown(f"""
     border-radius: 1.15em;
     padding:1.25em 1.5em 1.1em 1.5em;
     margin-bottom:1.5em;
-    font-size:1.07em;
+    font-size:1.08em;
     box-shadow: 0 3px 18px #eee;
 }}
 .info-bar {{
@@ -57,15 +58,15 @@ st.markdown("""
 <div class='zn-box'>
 <b>How it works:</b>
 <ul>
-<li>🔗 Enter your public crypto wallet (used as unique proof-of-audit input)</li>
-<li>🪙 Add any tokens (BTC, ETH, etc)—check live price compliance via CoinMarketCap</li>
-<li>⛓️ For each token, we compute a <b>real blockchain-style SHA-256 audit hash</b> using all key fields</li>
-<li>📥 Download your audit log CSV for future proof and verification</li>
+<li>🔗 Enter a public crypto wallet (used as unique proof-of-audit input)</li>
+<li>🪙 Add tokens (BTC, ETH, etc)—checks live price compliance via CoinMarketCap</li>
+<li>⛓️ Each token check gets a real <b>SHA-256 audit hash</b> for future proof</li>
+<li>📥 Download your audit log as CSV—auditable by any party anytime</li>
 </ul>
 </div>
 """, unsafe_allow_html=True)
 
-wallet_address = st.text_input("Enter your public wallet address (audit proof)", "")
+wallet_address = st.text_input("Enter your public wallet address (for immutable audit hash)", "")
 cmc_api_key = st.text_input("Your CoinMarketCap API Key", type="password")
 crypto_symbols = st.text_input("Crypto symbols (comma-separated, e.g. BTC,ETH)", "BTC,ETH")
 
@@ -88,6 +89,10 @@ def fmt_price(x):
     except Exception:
         return "N/A"
 
+def make_audit_hash(wallet, token, price, timestamp, breach):
+    s = f"{wallet}|{token}|{price}|{timestamp}|{breach}|finAIguard"
+    return hashlib.sha256(s.encode()).hexdigest()
+
 if st.button("🧠 Check Crypto Compliance Now"):
     cryptos = [s.strip().upper() for s in crypto_symbols.split(',') if s.strip()]
     rows = []
@@ -101,33 +106,45 @@ if st.button("🧠 Check Crypto Compliance Now"):
             continue
         compliance_condition = price > 10000
         breach = "🚩 YES" if compliance_condition else "✅ OK"
-        # Real immutable audit hash: all key fields
-        audit_str = f"{wallet_address}|{csym}|{fmt_price(price)}|{timestamp}|{breach}|finAIguard"
-        audit_hash = hashlib.sha256(audit_str.encode()).hexdigest()
+        price_str = fmt_price(price)
+        # Real audit hash with all fields made transparent below
+        audit_hash = make_audit_hash(wallet_address, csym + "-USD", price_str, timestamp, breach)
         rows.append({
             "timestamp_utc": timestamp,
             "wallet": wallet_address or "(not provided)",
             "token": csym + "-USD",
-            "current_price": fmt_price(price),
+            "current_price": price_str,
             "compliance_breach": breach,
             "audit_hash": audit_hash,
-            "audit_string": audit_str
+            "audit_formula": f"{wallet_address}|{csym + '-USD'}|{price_str}|{timestamp}|{breach}|finAIguard"
         })
     if rows:
         df = pd.DataFrame(rows)
-        st.markdown("<div class='info-bar'>🔍 <b>Live Compliance Audit (download for proof):</b></div>", unsafe_allow_html=True)
+        st.markdown("<div class='info-bar'>🔍 <b>Live Compliance Audit Results (verifiable!):</b></div>", unsafe_allow_html=True)
         st.dataframe(df[["timestamp_utc", "wallet", "token", "current_price", "compliance_breach", "audit_hash"]], use_container_width=True)
-        # Downloadable CSV proof log
-        buffer = io.StringIO()
-        df.to_csv(buffer, index=False)
-        st.download_button("Download Audit Log CSV", buffer.getvalue(), file_name="finAIguard_auditlog.csv", mime="text/csv")
+        # Downloadable audit log with formula for proof
+        buf = io.StringIO()
+        df.to_csv(buf, index=False)
+        st.download_button("Download Audit Log CSV", buf.getvalue(), file_name="finAIguard_auditlog.csv", mime="text/csv")
+
         st.markdown("""
-        <div style="color:#8323FF;margin:1.2em 0 0.5em 0;font-size:1.01em;">
-        For full transparency, the audit hash above is computed over:<br>
+        <div class='zn-box' style="background:#fffaed;font-size:1em;">
+        <b>For full transparency:</b><br>
+        The <b>audit hash</b> above is computed over:<br>
         <span style="background:#fff8c0;padding:0.13em 0.45em 0.13em 0.45em;border-radius:1em;font-family:monospace;">
         wallet|token|price|timestamp|breach|finAIguard
-        </span>
+        </span><br>
+        and can be verified by anyone from the CSV log!
         </div>
         """, unsafe_allow_html=True)
     else:
         st.error("No results (bad API or symbol typo)!")
+
+st.markdown("""
+---
+<div class='zn-box'>
+<b>Note:</b>
+Full on-chain wallet connect/POAP/NFT minting requires a React or Vite DApp frontend.<br>
+This Streamlit app provides cryptographic audit logging for proof-ready compliance analytics.
+</div>
+""", unsafe_allow_html=True)
