@@ -1,2 +1,13 @@
-# onchain-aml-dashboard
-Crypto Web3 Compliance &amp; Fraud Detection Dashboard built on Streamlit. Connects to CoinMarketCap for real-time crypto price checks, lets users generate blockchain-proof audit hashes, and verifies wallet compliance. Designed for GenZ, AML, and next-gen RegTech innovators.
+finaiguard-crypto-compliance is a Web3/crypto compliance dashboard for live regulatory checks, built with Streamlit.
+
+🪙 Connects to the CoinMarketCap API for real-time crypto price monitoring
+
+Demonstrates wallet-based risk/audit proof using hash linking
+
+Flags compliance breaches (customizable, e.g. price > $10k) for any entered token/symbol
+
+Beautiful GenZ-inspired UI
+
+For true wallet connect / POAP/NFT verification, use our React DApp starter (see repo instructions!)
+
+Built for the frontier of onchain compliance by Saumya Sanghvi
