@@ -11,7 +11,7 @@ safe = "#2ED47A"
 danger = "#D7263D"
 bg_gradient = "linear-gradient(90deg, #8323FF 0%, #23FFE6 100%)"
 
-st.set_page_config(page_title="finAIguard: Web3 Crypto Compliance", layout="centered")
+st.set_page_config(page_title="onchain aml dashboard: Web3 Crypto Compliance", layout="centered")
 
 st.markdown(f"""
 <style>
