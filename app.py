@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
 import requests
-from datetime import datetime
 import hashlib
+from datetime import datetime
+import io
 
-# --- Web3/GenZ Style ---
 primary = "#8323FF"
 safe = "#2ED47A"
 danger = "#D7263D"
@@ -57,16 +57,15 @@ st.markdown("""
 <div class='zn-box'>
 <b>How it works:</b>
 <ul>
-<li>🔗 Enter your public crypto wallet (for hash proof only, not a connection)</li>
+<li>🔗 Enter your public crypto wallet (used as unique proof-of-audit input)</li>
 <li>🪙 Add any tokens (BTC, ETH, etc)—check live price compliance via CoinMarketCap</li>
-<li>🚦 See flagged risks, instantly</li>
-<li>⛓️ Copy a blockchain-style proof hash, ready for audit/NFT use</li>
+<li>⛓️ For each token, we compute a <b>real blockchain-style SHA-256 audit hash</b> using all key fields</li>
+<li>📥 Download your audit log CSV for future proof and verification</li>
 </ul>
 </div>
 """, unsafe_allow_html=True)
 
-# Main inputs
-wallet_address = st.text_input("Enter your public wallet address (for demo audit hash)", "")
+wallet_address = st.text_input("Enter your public wallet address (audit proof)", "")
 cmc_api_key = st.text_input("Your CoinMarketCap API Key", type="password")
 crypto_symbols = st.text_input("Crypto symbols (comma-separated, e.g. BTC,ETH)", "BTC,ETH")
 
@@ -92,6 +91,7 @@ def fmt_price(x):
 if st.button("🧠 Check Crypto Compliance Now"):
     cryptos = [s.strip().upper() for s in crypto_symbols.split(',') if s.strip()]
     rows = []
+    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     for csym in cryptos:
         if not cmc_api_key:
             st.error("CMC API Key required!")
@@ -99,29 +99,35 @@ if st.button("🧠 Check Crypto Compliance Now"):
         price = fetch_cmc_price(csym, cmc_api_key)
         if price is None:
             continue
-        breach = "🚩 YES" if price > 10000 else "✅ OK"
-        proof = hashlib.sha256(f"{csym}{price}{wallet_address}".encode()).hexdigest()[:20]
+        compliance_condition = price > 10000
+        breach = "🚩 YES" if compliance_condition else "✅ OK"
+        # Real immutable audit hash: all key fields
+        audit_str = f"{wallet_address}|{csym}|{fmt_price(price)}|{timestamp}|{breach}|finAIguard"
+        audit_hash = hashlib.sha256(audit_str.encode()).hexdigest()
         rows.append({
-            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp_utc": timestamp,
+            "wallet": wallet_address or "(not provided)",
             "token": csym + "-USD",
             "current_price": fmt_price(price),
-            "wallet": wallet_address or "(not provided)",
             "compliance_breach": breach,
-            "proof_hash": proof,
+            "audit_hash": audit_hash,
+            "audit_string": audit_str
         })
     if rows:
         df = pd.DataFrame(rows)
-        st.markdown("<div class='info-bar'>🔍 <b>Live Compliance Scan Results:</b></div>", unsafe_allow_html=True)
-        st.dataframe(df, use_container_width=True)
+        st.markdown("<div class='info-bar'>🔍 <b>Live Compliance Audit (download for proof):</b></div>", unsafe_allow_html=True)
+        st.dataframe(df[["timestamp_utc", "wallet", "token", "current_price", "compliance_breach", "audit_hash"]], use_container_width=True)
+        # Downloadable CSV proof log
+        buffer = io.StringIO()
+        df.to_csv(buffer, index=False)
+        st.download_button("Download Audit Log CSV", buffer.getvalue(), file_name="finAIguard_auditlog.csv", mime="text/csv")
+        st.markdown("""
+        <div style="color:#8323FF;margin:1.2em 0 0.5em 0;font-size:1.01em;">
+        For full transparency, the audit hash above is computed over:<br>
+        <span style="background:#fff8c0;padding:0.13em 0.45em 0.13em 0.45em;border-radius:1em;font-family:monospace;">
+        wallet|token|price|timestamp|breach|finAIguard
+        </span>
+        </div>
+        """, unsafe_allow_html=True)
     else:
         st.error("No results (bad API or symbol typo)!")
-
-st.markdown("""
----
-<div class='zn-box'>
-<b>Web3 Tip:</b> 
-Want true wallet connection for claim, sign, or on-chain POAP/NFT?<br>
-Build a React or Vite app with <a href="https://docs.metamask.io/wallet/how-to/#integrate-with-your-web-app" target="_blank">MetaMask</a> or <a href='https://walletconnect.com/' target='_blank'>WalletConnect</a>.<br>
-This Streamlit app provides compliance analytics and blockchain-proof audit hashes.
-</div>
-""", unsafe_allow_html=True)
