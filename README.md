@@ -1,11 +1,19 @@
-finaiguard-crypto-compliance is a Web3/crypto compliance dashboard for live regulatory checks, built with Streamlit.
+## 🏆 Ultimate Proof-of-Compliance Workflow
 
-Demonstrates wallet-based risk/audit proof using hash linking
+1. Run a compliance check with finAIguard
+2. Download your audit CSV log (includes all hashes)
+3. Add to IPFS for public, immutable storage (get the content hash URL)
+4. (Optional) Store the CSV file or just the hash in a blockchain smart contract for additional timestamped, on-chain proof
 
-Flags compliance breaches (customizable, e.g. price > $10k) for any entered token/symbol
+---
 
-Beautiful GenZ-inspired UI
+## 🤝 Credits
 
-For true wallet connect / POAP/NFT verification, use our React DApp starter (see repo instructions!)
+**Built by Saumya Sanghvi**  
+Inspired by RegTech 3.0, DeFi, and the crypto compliance movement.
 
-Built for the frontier of onchain compliance by Saumya Sanghvi
+---
+
+## 📢 Disclaimer
+
+This project is for educational and research use. No warranty, financial or legal advice.
