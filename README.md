@@ -1,7 +1,5 @@
 finaiguard-crypto-compliance is a Web3/crypto compliance dashboard for live regulatory checks, built with Streamlit.
 
-🪙 Connects to the CoinMarketCap API for real-time crypto price monitoring
-
 Demonstrates wallet-based risk/audit proof using hash linking
 
 Flags compliance breaches (customizable, e.g. price > $10k) for any entered token/symbol
