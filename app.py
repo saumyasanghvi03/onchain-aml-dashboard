@@ -6,19 +6,6 @@ from datetime import datetime
 import io
 import os
 
-# Regulatory Environment Variables Configuration
-FINCEN_BSA_REPORTING = os.environ.get("FINCEN_BSA_REPORTING", "disabled")
-EU_AMLD5_COMPLIANCE = os.environ.get("EU_AMLD5_COMPLIANCE", "disabled")
-REGULATORY_JURISDICTION = os.environ.get("REGULATORY_JURISDICTION", "undefined")
-
-# Print or log their values for verification
-def print_regulatory_env():
-    print(f"FINCEN_BSA_REPORTING = {FINCEN_BSA_REPORTING}")
-    print(f"EU_AMLD5_COMPLIANCE = {EU_AMLD5_COMPLIANCE}")
-    print(f"REGULATORY_JURISDICTION = {REGULATORY_JURISDICTION}")
-
-print_regulatory_env()
-
 # --- Web3/GenZ UI Styles ---
 primary = "#8323FF"
 safe = "#2ED47A"
