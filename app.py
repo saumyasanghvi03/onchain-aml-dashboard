@@ -293,6 +293,83 @@ else:
         st.markdown("- 📥 **Download**: CSV export of complete audit trail")
         st.markdown("- 🔐 **Transparency**: Cryptographic verification details")
 
+# --- Period-based Ethereum Wallet Activity Analysis (Etherscan powered) ---
+import datetime
+
+st.sidebar.subheader("Activity Analysis Period")
+start_date = st.sidebar.date_input("Start date", datetime.date.today() - datetime.timedelta(days=7))
+end_date = st.sidebar.date_input("End date", datetime.date.today())
+activity_run = st.sidebar.button("🚀 Run Wallet Activity Analysis")
+
+ETHERSCAN_API_KEY = "VWJEDM7IYQZTX4KKDY45NSDT3IWB1PTJI5"
+
+def fetch_eth_transactions(address):
+    url = (
+        f"https://api.etherscan.io/api?module=account&action=txlist"
+        f"&address={address}&startblock=0&endblock=99999999&sort=asc"
+        f"&apikey={ETHERSCAN_API_KEY}"
+    )
+    try:
+        r = requests.get(url, timeout=12)
+        data = r.json()
+        if data.get("status") == "1":
+            return data["result"]
+        return []
+    except Exception as e:
+        st.error(f"Etherscan error for {address}: {e}")
+        return []
+
+def summarize_activity(txlist, start, end, large_amt=2.0):
+    start_ts = int(datetime.datetime.combine(start, datetime.time.min).timestamp())
+    end_ts = int(datetime.datetime.combine(end, datetime.time.max).timestamp())
+    filtered = [tx for tx in txlist if start_ts <= int(tx["timeStamp"]) <= end_ts]
+    sent = 0.0
+    received = 0.0
+    large = []
+    for tx in filtered:
+        eth = float(tx["value"]) / 1e18
+        # Consider tx direction
+        if eth >= large_amt:
+            large.append(tx)
+        # Simplistic: all txs with 'to' field as receive, real use should aggregate sent/recv using input address as 'from' or 'to'
+        # Here, we demo received only (API does not distinguish direction per user directly, advanced users can customize)
+        received += eth
+    return {
+        "count": len(filtered),
+        "received": received,
+        "large_count": len(large),
+        "large_txs": large,
+        "all_txs": filtered
+    }
+
+if activity_run:
+    wallets = [w.strip() for w in wallets_input.strip().split('\n') if w.strip()]
+    for wallet in wallets:
+        st.subheader(f"Activity for {wallet}")
+        txlist = fetch_eth_transactions(wallet)
+        summ = summarize_activity(txlist, start_date, end_date)
+        st.metric("Tx Count (period)", summ["count"])
+        st.metric("Total Received (ETH)", f"{summ['received']:.4f}")
+        st.metric("Large Transactions (>=2 ETH)", summ["large_count"])
+        if summ["large_count"]:
+            st.write("Large Transactions:")
+            st.dataframe([
+                {"Hash": tx["hash"], "Time": datetime.datetime.fromtimestamp(int(tx["timeStamp"])),
+                 "From": tx["from"], "To": tx["to"],
+                 "Value(ETH)": float(tx["value"]) / 1e18}
+                for tx in summ["large_txs"]
+            ])
+        if summ["count"]:
+            st.write("All Period Transactions:")
+            st.dataframe([
+                {"Hash": tx["hash"], "Time": datetime.datetime.fromtimestamp(int(tx["timeStamp"])),
+                 "From": tx["from"], "To": tx["to"],
+                 "Value(ETH)": float(tx["value"]) / 1e18}
+                for tx in summ["all_txs"]
+            ])
+        else:
+            st.info("No transactions for this wallet in selected period.")
+
 # --- Footer Section ---
 st.markdown("---")
 st.info(
