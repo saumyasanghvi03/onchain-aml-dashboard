@@ -98,6 +98,13 @@ api_key = st.sidebar.text_input(
     help="For higher rate limits"
 )
 
+etherscan_api_key_input = st.sidebar.text_input(
+    "Etherscan API Key (optional)",
+    value="",  # leave blank for user entry
+    type="password",
+    help="Your Etherscan API key for historical wallet activity analysis."
+)
+
 # --- Display Supported Tokens ---
 with st.expander("ℹ️ Supported Tokens on Ethereum"):
     st.markdown("**Currently supported tokens on Ethereum:**")
