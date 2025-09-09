@@ -14,77 +14,9 @@ TOKEN_MAPPING = {
     'USDT': 'tether'     # USDT on Ethereum
 }
 
-# --- CSS Styles Injection (Single Block) ---
-st.markdown("""
-<style>
-.bigfont {
-    font-size: 2.4rem !important;
-    font-weight: 850;
-    color: #000 !important;
-    letter-spacing: -1px;
-}
-.web3-gradient {
-    background: linear-gradient(90deg, #8323FF 0%, #23FFE6 100%);
-    padding: 2rem;
-    border-radius: 1.1rem;
-    color: #fff !important;
-    margin-bottom: 2.2rem;
-    box-shadow: 0 4px 28px #c8c8e4;
-}
-.zn-box {
-    background: #f9f9fb;
-    border-radius: 1.15em;
-    padding: 1.25em 1.5em 1.1em 1.5em;
-    margin-bottom: 1.5em;
-    font-size: 1.08em;
-    box-shadow: 0 3px 18px #eee;
-}
-.info-bar {
-    background: #8323FF15;
-    color: #222;
-    padding: 0.42em 1em;
-    margin-bottom: 1.2em;
-    border-radius: 1em;
-    font-size: 1.11em;
-    font-weight: 600;
-}
-.warning-box {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    color: #856404;
-    padding: 0.75em 1em;
-    margin-bottom: 1em;
-    border-radius: 0.5em;
-    font-size: 0.95em;
-}
-.success-box {
-    background: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
-    padding: 0.75em 1em;
-    margin-bottom: 1em;
-    border-radius: 0.5em;
-    font-size: 0.95em;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# --- CSS Class Demonstrations ---
-st.markdown('<h1 class="bigfont">🔍 finAIguard</h1>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="web3-gradient">Real-time Ethereum compliance monitoring with cryptographic audit trails</div>',
-    unsafe_allow_html=True
-)
-
-st.markdown('<div class="info-bar">📋 CSS Styles Demonstration Section</div>', unsafe_allow_html=True)
-
-with st.expander("🎨 View All CSS Style Examples", expanded=True):
-    st.markdown('<div class="bigfont">Big Font Example - Main Title Style</div>', unsafe_allow_html=True)
-    st.markdown('<div class="web3-gradient">Web3 Gradient - Premium Section Background</div>', unsafe_allow_html=True)
-    st.markdown('<div class="zn-box">ZN Box - Standard Content Container with Shadow</div>', unsafe_allow_html=True)
-    st.markdown('<div class="info-bar">Info Bar - Information Highlighting</div>', unsafe_allow_html=True)
-    st.markdown('<div class="warning-box">⚠️ Warning Box - Alert Messages</div>', unsafe_allow_html=True)
-    st.markdown('<div class="success-box">✅ Success Box - Confirmation Messages</div>', unsafe_allow_html=True)
+# --- Main App Interface ---
+st.title("🔍 finAIguard")
+st.markdown("Real-time Ethereum compliance monitoring with cryptographic audit trails")
 
 # --- Sidebar Configuration ---
 st.sidebar.markdown("### Configuration")
@@ -190,24 +122,20 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
         
         # Display warnings for skipped tokens
         if skipped_tokens:
-            st.markdown('<div class="warning-box">', unsafe_allow_html=True)
-            st.markdown("**⚠️ Skipped Unsupported Tokens:**")
+            st.warning("⚠️ Skipped Unsupported Tokens:")
             for token in skipped_tokens:
                 st.markdown(f"• {token} - not supported on Ethereum")
-            st.markdown('</div>', unsafe_allow_html=True)
         
         # Display successful tokens
         if successful_tokens:
-            st.markdown('<div class="success-box">', unsafe_allow_html=True)
-            st.markdown("**✅ Successfully Processed Tokens on Ethereum:**")
+            st.success("✅ Successfully Processed Tokens on Ethereum:")
             for symbol, price in successful_tokens:
                 st.markdown(f"• {symbol}: ${price:,.4f}")
-            st.markdown('</div>', unsafe_allow_html=True)
         
         if results:
             df = pd.DataFrame(results)
             
-            st.markdown('<div class="info-bar">✅ Ethereum Compliance Analysis Complete</div>', unsafe_allow_html=True)
+            st.success("✅ Ethereum Compliance Analysis Complete")
             
             # Summary metrics
             col1, col2, col3 = st.columns(3)
@@ -237,20 +165,11 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
             
             # Enhanced transparency explanation
             st.markdown(
-"""
-            <div class="zn-box" style="background:#fffaed;font-size:1em;">
-            🔐 Audit Trail Transparency:
-            
-            The audit hash is computed over:
-            
-            <span style="background:#fff8c0;padding:0.13em 0.45em 0.13em 0.45em;border-radius:1em;font-family:monospace;">
-            wallet|token|coingecko_id|price|timestamp|breach|finAIguard
-            </span>
-            
-            This hash includes the specific CoinGecko token ID used for Ethereum tokens,
-            ensuring full traceability of price sources. All data can be verified from the CSV log!
-            </div>
-            """, unsafe_allow_html=True)
+                "### 🔐 Audit Trail Transparency\n\n"
+                "The audit hash is computed over: `wallet|token|coingecko_id|price|timestamp|breach|finAIguard`\n\n"
+                "This hash includes the specific CoinGecko token ID used for Ethereum tokens, "
+                "ensuring full traceability of price sources. All data can be verified from the CSV log!"
+            )
         else:
             if skipped_tokens and not successful_tokens:
                 st.error("No supported tokens found for Ethereum. Please check the supported tokens above.")
@@ -261,8 +180,7 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
 
 # --- Footer Section ---
 st.markdown("---")
-st.markdown(
-"""<div class="zn-box">Note:
-Full on-chain wallet connect/POAP/NFT minting requires a React or Vite DApp frontend.
-This Streamlit app provides cryptographic audit logging for proof-ready compliance analytics with Ethereum-only support.</div>""", unsafe_allow_html=True
+st.info(
+    "**Note:** Full on-chain wallet connect/POAP/NFT minting requires a React or Vite DApp frontend. "
+    "This Streamlit app provides cryptographic audit logging for proof-ready compliance analytics with Ethereum-only support."
 )
