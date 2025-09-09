@@ -14,9 +14,10 @@ TOKEN_MAPPING = {
     'USDT': 'tether'     # USDT on Ethereum
 }
 
-# --- CSS Styles in Single Block ---
-st.markdown(
-""".bigfont {
+# --- CSS Styles Injection (Single Block) ---
+st.markdown("""
+<style>
+.bigfont {
     font-size: 2.4rem !important;
     font-weight: 850;
     color: #000 !important;
@@ -64,14 +65,26 @@ st.markdown(
     margin-bottom: 1em;
     border-radius: 0.5em;
     font-size: 0.95em;
-}""", unsafe_allow_html=True)
+}
+</style>
+""", unsafe_allow_html=True)
 
-# --- Title & Description ---
+# --- CSS Class Demonstrations ---
 st.markdown('<h1 class="bigfont">🔍 finAIguard</h1>', unsafe_allow_html=True)
 st.markdown(
     '<div class="web3-gradient">Real-time Ethereum compliance monitoring with cryptographic audit trails</div>',
     unsafe_allow_html=True
 )
+
+st.markdown('<div class="info-bar">📋 CSS Styles Demonstration Section</div>', unsafe_allow_html=True)
+
+with st.expander("🎨 View All CSS Style Examples", expanded=True):
+    st.markdown('<div class="bigfont">Big Font Example - Main Title Style</div>', unsafe_allow_html=True)
+    st.markdown('<div class="web3-gradient">Web3 Gradient - Premium Section Background</div>', unsafe_allow_html=True)
+    st.markdown('<div class="zn-box">ZN Box - Standard Content Container with Shadow</div>', unsafe_allow_html=True)
+    st.markdown('<div class="info-bar">Info Bar - Information Highlighting</div>', unsafe_allow_html=True)
+    st.markdown('<div class="warning-box">⚠️ Warning Box - Alert Messages</div>', unsafe_allow_html=True)
+    st.markdown('<div class="success-box">✅ Success Box - Confirmation Messages</div>', unsafe_allow_html=True)
 
 # --- Sidebar Configuration ---
 st.sidebar.markdown("### Configuration")
@@ -84,7 +97,6 @@ crypto_symbols = st.sidebar.text_input(
     "Crypto Symbols (comma-separated)",
     "BTC,ETH,USDT"
 )
-
 api_key = st.sidebar.text_input(
     "CoinGecko API Key (optional)",
     type="password",
@@ -228,18 +240,12 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
 """
             <div class="zn-box" style="background:#fffaed;font-size:1em;">
             🔐 Audit Trail Transparency:
-
-
             
             The audit hash is computed over:
-
-
             
             <span style="background:#fff8c0;padding:0.13em 0.45em 0.13em 0.45em;border-radius:1em;font-family:monospace;">
             wallet|token|coingecko_id|price|timestamp|breach|finAIguard
             </span>
-
-
             
             This hash includes the specific CoinGecko token ID used for Ethereum tokens,
             ensuring full traceability of price sources. All data can be verified from the CSV log!
