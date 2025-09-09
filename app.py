@@ -7,9 +7,8 @@ import io
 import os
 
 # --- CSS Styles in Single Block ---
-st.markdown("""
-<style>
-.bigfont {
+st.markdown(
+""".bigfont {
     font-size: 2.4rem !important;
     font-weight: 850;
     color: #000 !important;
@@ -39,181 +38,172 @@ st.markdown("""
     border-radius: 1em;
     font-size: 1.11em;
     font-weight: 600;
-}
-</style>
-""", unsafe_allow_html=True)
+}""", unsafe_allow_html=True)
 
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="onchain aml dashboard: Web3 Crypto Compliance", 
-    layout="centered"
+# --- Title & Description ---
+st.markdown('<h1 class="bigfont">🔍 finAIguard</h1>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="web3-gradient">Real-time on-chain compliance monitoring with cryptographic audit trails</div>',
+    unsafe_allow_html=True
 )
 
-# --- UI Style Variables ---
-primary = "#8323FF"
-safe = "#2ED47A"
-danger = "#D7263D"
-bg_gradient = "linear-gradient(90deg, #8323FF 0%, #23FFE6 100%)"
-
-# --- Header Section ---
-st.markdown("""
-<div class="web3-gradient">
-    <span class="bigfont">finAIguard 🔮</span>
-    <div style="font-size:1.28em; font-weight:600; margin-top: 0.5em;">Web3 Crypto Compliance & Fraud Dashboard</div>
-    <div style="margin-top:0.5em;font-size:1.04em;letter-spacing:-0.01em;">Next-Gen RegTech for GenZ & DeFi</div>
-</div>
-""", unsafe_allow_html=True)
-
-# --- How It Works Section ---
-st.markdown("""
-<div class="zn-box">
-How it works:
-<br/>
-🔗 Enter a public crypto wallet (used as unique proof-of-audit input)
-<br/>
-🪙 Add tokens (BTC, ETH, etc)—checks live price compliance via CoinMarketCap
-<br/>
-⛓️ Each token check gets a real SHA-256 audit hash for future proof
-<br/>
-📥 Download your audit log as CSV—auditable by any party anytime
-</div>
-""", unsafe_allow_html=True)
-
-# --- Input Widgets ---
-wallet_address = st.text_input(
-    "Enter your public wallet address (for immutable audit hash)", 
-    ""
+# --- Sidebar Configuration ---
+st.sidebar.markdown("### Configuration")
+wallets_input = st.sidebar.text_area(
+    "Wallet Addresses (one per line)",
+    "0x742d35Cc6634C0532925a3b8D7389A6dCfc3A6F3\n0x8BA1F109551bD432803012645Hac136c0c7b908\n0x1F916BF5c16eE52c9E79E42A60dBd0b1A1C26A2E",
+    height=120
+)
+crypto_symbols = st.sidebar.text_input(
+    "Crypto Symbols (comma-separated)",
+    "BTC,ETH,USDT"
 )
 
-cmc_api_key = st.text_input(
-    "Your CoinMarketCap API Key", 
-    type="password"
+# --- Blockchain Selection ---
+supported_chains = ["Ethereum", "Binance Smart Chain (BSC)", "Polygon", "Bitcoin"]
+selected_chains = st.multiselect(
+    "Select blockchain(s) for compliance check",
+    supported_chains,
+    default=["Ethereum"]
 )
 
-crypto_symbols = st.text_input(
-    "Crypto symbols (comma-separated, e.g. BTC,ETH)", 
-    "BTC,ETH"
+api_key = st.sidebar.text_input(
+    "CoinGecko API Key (optional)",
+    type="password",
+    help="For higher rate limits"
 )
 
-# --- Helper Functions ---
-def fetch_cmc_price(symbol, api_key):
-    """Fetch cryptocurrency price from CoinMarketCap API"""
-    url = 'https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest'
-    params = {'symbol': symbol.upper(), 'convert': 'USD'}
-    headers = {'Accepts': 'application/json', 'X-CMC_PRO_API_KEY': api_key}
-    
-    try:
-        r = requests.get(url, headers=headers, params=params)
-        r.raise_for_status()
-        price = r.json()['data'][symbol.upper()]['quote']['USD']['price']
-        return float(price)
-    except Exception as e:
-        st.warning(f"CMC error for {symbol}: {e}")
-        return None
-
-def fmt_price(x):
-    """Format price as currency string"""
-    try:
-        return f"${float(x):,.2f}"
-    except Exception:
-        return "N/A"
-
-def make_audit_hash(wallet, token, price, timestamp, breach):
-    """Generate SHA-256 audit hash for transparency"""
-    s = f"{wallet}|{token}|{price}|{timestamp}|{breach}|finAIguard"
-    return hashlib.sha256(s.encode()).hexdigest()
-
-# --- Main Compliance Check Logic ---
-if st.button("🧠 Check Crypto Compliance Now"):
-    if not cmc_api_key:
-        st.error("CMC API Key required!")
-        st.stop()
-    
-    cryptos = [s.strip().upper() for s in crypto_symbols.split(',') if s.strip()]
-    rows = []
-    timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-    
-    for csym in cryptos:
-        price = fetch_cmc_price(csym, cmc_api_key)
-        if price is None:
-            continue
-        
-        # Compliance logic: flag if price > $10,000
-        compliance_condition = price > 10000
-        breach = "🚩 YES" if compliance_condition else "✅ OK"
-        price_str = fmt_price(price)
-        
-        # Generate audit hash with all fields transparent
-        audit_hash = make_audit_hash(
-            wallet_address, 
-            csym + "-USD", 
-            price_str, 
-            timestamp, 
-            breach
-        )
-        
-        rows.append({
-            "timestamp_utc": timestamp,
-            "wallet": wallet_address or "(not provided)",
-            "token": csym + "-USD",
-            "current_price": price_str,
-            "compliance_breach": breach,
-            "audit_hash": audit_hash,
-            "audit_formula": f"{wallet_address}|{csym + '-USD'}|{price_str}|{timestamp}|{breach}|finAIguard"
-        })
-    
-    if rows:
-        df = pd.DataFrame(rows)
-        
-        # Display results with proper HTML formatting
-        st.markdown("""
-        <div class="info-bar">
-        🔍 Live Compliance Audit Results (verifiable!):
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Display dataframe
-        st.dataframe(
-            df[["timestamp_utc", "wallet", "token", "current_price", "compliance_breach", "audit_hash"]], 
-            use_container_width=True
-        )
-        
-        # Download button for audit log
-        buf = io.StringIO()
-        df.to_csv(buf, index=False)
-        st.download_button(
-            "Download Audit Log CSV", 
-            buf.getvalue(), 
-            file_name="finAIguard_auditlog.csv", 
-            mime="text/csv"
-        )
-        
-        # Transparency explanation
-        st.markdown("""
-        <div class="zn-box" style="background:#fffaed;font-size:1em;">
-        For full transparency:
-        <br/><br/>
-        The audit hash above is computed over:
-        <br/>
-        <span style="background:#fff8c0;padding:0.13em 0.45em 0.13em 0.45em;border-radius:1em;font-family:monospace;">
-        wallet|token|price|timestamp|breach|finAIguard
-        </span>
-        <br/><br/>
-        and can be verified by anyone from the CSV log!
-        </div>
-        """, unsafe_allow_html=True)
+# --- Main Content ---
+if st.button("🚀 Run Compliance Check", use_container_width=True):
+    if not selected_chains:
+        st.error("Please select at least one blockchain.")
     else:
-        st.error("No results (bad API or symbol typo)!")
+        wallet_list = [w.strip() for w in wallets_input.split('\n') if w.strip()]
+        symbol_list = [s.strip().upper() for s in crypto_symbols.split(',') if s.strip()]
+        
+        if wallet_list and symbol_list:
+            # Initialize results list
+            results = []
+            
+            with st.spinner("Running compliance checks..."):
+                # Nested loop for both symbols and chains
+                for symbol in symbol_list:
+                    for chain in selected_chains:
+                        # Fetch crypto price from CoinGecko
+                        url = "https://api.coingecko.com/api/v3/simple/price"
+                        params = {
+                            'ids': symbol.lower() if symbol.lower() in ['bitcoin', 'ethereum'] else f'{symbol.lower()}-token',
+                            'vs_currencies': 'usd'
+                        }
+                        
+                        if api_key:
+                            params['x_cg_demo_api_key'] = api_key
+                        
+                        try:
+                            response = requests.get(url, params=params, timeout=10)
+                            data = response.json()
+                            
+                            # Handle different symbol formats
+                            price = None
+                            if symbol.lower() == 'btc' or symbol.lower() == 'bitcoin':
+                                price = data.get('bitcoin', {}).get('usd')
+                            elif symbol.lower() == 'eth' or symbol.lower() == 'ethereum':
+                                price = data.get('ethereum', {}).get('usd')
+                            else:
+                                # Try various token formats
+                                for key in data.keys():
+                                    if key.startswith(symbol.lower()):
+                                        price = data[key].get('usd')
+                                        break
+                            
+                            if price is None:
+                                st.warning(f"Could not fetch price for {symbol} on {chain}")
+                                continue
+                                
+                        except Exception as e:
+                            st.error(f"API error for {symbol} on {chain}: {str(e)}")
+                            continue
+                        
+                        # Process each wallet for this symbol-chain combination
+                        for wallet in wallet_list:
+                            timestamp = datetime.utcnow().isoformat()
+                            
+                            # Simple compliance check (price-based)
+                            compliance_breach = price > 50000 if symbol.upper() in ['BTC', 'BITCOIN'] else price > 3000
+                            
+                            # Create audit hash
+                            audit_string = f"{wallet}|{symbol}|{chain}|{price}|{timestamp}|{compliance_breach}|finAIguard"
+                            audit_hash = hashlib.sha256(audit_string.encode()).hexdigest()[:16]
+                            
+                            results.append({
+                                'timestamp_utc': timestamp,
+                                'wallet': wallet,
+                                'token': symbol,
+                                'chain': chain,
+                                'current_price': price,
+                                'compliance_breach': compliance_breach,
+                                'audit_hash': audit_hash
+                            })
+            
+            if results:
+                df = pd.DataFrame(results)
+                
+                st.markdown('<div class="info-bar">✅ Compliance Analysis Complete</div>', unsafe_allow_html=True)
+                
+                # Summary metrics
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Total Checks", len(df))
+                with col2:
+                    st.metric("Wallets", len(wallet_list))
+                with col3:
+                    st.metric("Chains", len(selected_chains))
+                with col4:
+                    breaches = df['compliance_breach'].sum()
+                    st.metric("Breaches", breaches, delta=f"{breaches} alerts")
+                
+                # Display dataframe
+                st.dataframe(
+                    df[['timestamp_utc', 'wallet', 'token', 'chain', 'current_price', 'compliance_breach', 'audit_hash']], 
+                    use_container_width=True
+                )
+                
+                # Download button for audit log
+                buf = io.StringIO()
+                df.to_csv(buf, index=False)
+                st.download_button(
+                    "Download Audit Log CSV", 
+                    buf.getvalue(), 
+                    file_name="finAIguard_auditlog.csv", 
+                    mime="text/csv"
+                )
+                
+                # Transparency explanation
+                st.markdown(
+"""
+                <div class="zn-box" style="background:#fffaed;font-size:1em;">
+                For full transparency:
+                <br><br>
+                The audit hash above is computed over:
+                <br><br>
+                <span style="background:#fff8c0;padding:0.13em 0.45em 0.13em 0.45em;border-radius:1em;font-family:monospace;">
+                wallet|token|chain|price|timestamp|breach|finAIguard
+                </span>
+                <br><br>
+                and can be verified by anyone from the CSV log!
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.error("No results (bad API or symbol typo)!")
+        else:
+            st.error("Please provide both wallet addresses and crypto symbols.")
 
 # --- Footer Section ---
 st.markdown("---")
+st.markdown(
+"""<div class="zn-box">Note:
 
-st.markdown("""
-<div class="zn-box">
-Note:
-<br/><br/>
 Full on-chain wallet connect/POAP/NFT minting requires a React or Vite DApp frontend.
-<br/><br/>
-This Streamlit app provides cryptographic audit logging for proof-ready compliance analytics.
-</div>
-""", unsafe_allow_html=True)
+
+This Streamlit app provides cryptographic audit logging for proof-ready compliance analytics.</div>""", unsafe_allow_html=True
+)
