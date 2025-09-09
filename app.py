@@ -308,7 +308,7 @@ start_date = st.sidebar.date_input("Start date", datetime.date.today() - datetim
 end_date = st.sidebar.date_input("End date", datetime.date.today())
 activity_run = st.sidebar.button("🚀 Run Wallet Activity Analysis")
 
-ETHERSCAN_API_KEY = "VWJEDM7IYQZTX4KKDY45NSDT3IWB1PTJI5"
+ETHERSCAN_API_KEY = etherscan_api_key_input
 
 def fetch_eth_transactions(address):
     url = (
