@@ -4,6 +4,20 @@ import requests
 import hashlib
 from datetime import datetime
 import io
+import os
+
+# Regulatory Environment Variables Configuration
+FINCEN_BSA_REPORTING = os.environ.get("FINCEN_BSA_REPORTING", "disabled")
+EU_AMLD5_COMPLIANCE = os.environ.get("EU_AMLD5_COMPLIANCE", "disabled")
+REGULATORY_JURISDICTION = os.environ.get("REGULATORY_JURISDICTION", "undefined")
+
+# Print or log their values for verification
+def print_regulatory_env():
+    print(f"FINCEN_BSA_REPORTING = {FINCEN_BSA_REPORTING}")
+    print(f"EU_AMLD5_COMPLIANCE = {EU_AMLD5_COMPLIANCE}")
+    print(f"REGULATORY_JURISDICTION = {REGULATORY_JURISDICTION}")
+
+print_regulatory_env()
 
 # --- Web3/GenZ UI Styles ---
 primary = "#8323FF"
@@ -13,9 +27,7 @@ bg_gradient = "linear-gradient(90deg, #8323FF 0%, #23FFE6 100%)"
 
 st.set_page_config(page_title="onchain aml dashboard: Web3 Crypto Compliance", layout="centered")
 
-st.markdown(f"""
-<style>
-.bigfont {{
+st.markdown(f""".bigfont {{
     font-size: 2.4rem !important;
     font-weight: 850;
     color: #000 !important;
@@ -46,25 +58,19 @@ st.markdown(f"""
     font-size: 1.11em;
     font-weight: 600;
 }}
-</style>
-<div class='web3-gradient'>
-    <span class='bigfont'>finAIguard 🔮</span>
-    <div style='font-size:1.28em; font-weight:600; margin-top: 0.5em;'>Web3 Crypto Compliance & Fraud Dashboard</div>
-    <div style='margin-top:0.5em;font-size:1.04em;letter-spacing:-0.01em;'>Next-Gen RegTech for GenZ & DeFi</div>
-</div>
-""", unsafe_allow_html=True)
+<div class="web3-gradient">
+    <span class="bigfont">finAIguard 🔮</span>
+    <div style="font-size:1.28em; font-weight:600; margin-top: 0.5em;">Web3 Crypto Compliance & Fraud Dashboard</div>
+    <div style="margin-top:0.5em;font-size:1.04em;letter-spacing:-0.01em;">Next-Gen RegTech for GenZ & DeFi</div>
+</div>""", unsafe_allow_html=True)
 
-st.markdown("""
-<div class='zn-box'>
-<b>How it works:</b>
-<ul>
-<li>🔗 Enter a public crypto wallet (used as unique proof-of-audit input)</li>
-<li>🪙 Add tokens (BTC, ETH, etc)—checks live price compliance via CoinMarketCap</li>
-<li>⛓️ Each token check gets a real <b>SHA-256 audit hash</b> for future proof</li>
-<li>📥 Download your audit log as CSV—auditable by any party anytime</li>
-</ul>
-</div>
-""", unsafe_allow_html=True)
+st.markdown("""<div class="zn-box">
+How it works:
+🔗 Enter a public crypto wallet (used as unique proof-of-audit input)
+🪙 Add tokens (BTC, ETH, etc)—checks live price compliance via CoinMarketCap
+⛓️ Each token check gets a real SHA-256 audit hash for future proof
+📥 Download your audit log as CSV—auditable by any party anytime
+</div>""", unsafe_allow_html=True)
 
 wallet_address = st.text_input("Enter your public wallet address (for immutable audit hash)", "")
 cmc_api_key = st.text_input("Your CoinMarketCap API Key", type="password")
@@ -97,18 +103,23 @@ if st.button("🧠 Check Crypto Compliance Now"):
     cryptos = [s.strip().upper() for s in crypto_symbols.split(',') if s.strip()]
     rows = []
     timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    
     for csym in cryptos:
         if not cmc_api_key:
             st.error("CMC API Key required!")
             st.stop()
+        
         price = fetch_cmc_price(csym, cmc_api_key)
         if price is None:
             continue
+        
         compliance_condition = price > 10000
         breach = "🚩 YES" if compliance_condition else "✅ OK"
         price_str = fmt_price(price)
+        
         # Real audit hash with all fields made transparent below
         audit_hash = make_audit_hash(wallet_address, csym + "-USD", price_str, timestamp, breach)
+        
         rows.append({
             "timestamp_utc": timestamp,
             "wallet": wallet_address or "(not provided)",
@@ -118,22 +129,27 @@ if st.button("🧠 Check Crypto Compliance Now"):
             "audit_hash": audit_hash,
             "audit_formula": f"{wallet_address}|{csym + '-USD'}|{price_str}|{timestamp}|{breach}|finAIguard"
         })
+    
     if rows:
         df = pd.DataFrame(rows)
-        st.markdown("<div class='info-bar'>🔍 <b>Live Compliance Audit Results (verifiable!):</b></div>", unsafe_allow_html=True)
+        st.markdown("<div class=\"info-bar\">🔍 Live Compliance Audit Results (verifiable!):</div>", unsafe_allow_html=True)
         st.dataframe(df[["timestamp_utc", "wallet", "token", "current_price", "compliance_breach", "audit_hash"]], use_container_width=True)
+        
         # Downloadable audit log with formula for proof
         buf = io.StringIO()
         df.to_csv(buf, index=False)
         st.download_button("Download Audit Log CSV", buf.getvalue(), file_name="finAIguard_auditlog.csv", mime="text/csv")
-
+        
         st.markdown("""
-        <div class='zn-box' style="background:#fffaed;font-size:1em;">
-        <b>For full transparency:</b><br>
-        The <b>audit hash</b> above is computed over:<br>
+        <div class="zn-box" style="background:#fffaed;font-size:1em;">
+        For full transparency:
+
+        The audit hash above is computed over:
+
         <span style="background:#fff8c0;padding:0.13em 0.45em 0.13em 0.45em;border-radius:1em;font-family:monospace;">
         wallet|token|price|timestamp|breach|finAIguard
-        </span><br>
+        </span>
+
         and can be verified by anyone from the CSV log!
         </div>
         """, unsafe_allow_html=True)
@@ -142,9 +158,9 @@ if st.button("🧠 Check Crypto Compliance Now"):
 
 st.markdown("""
 ---
-<div class='zn-box'>
-<b>Note:</b>
-Full on-chain wallet connect/POAP/NFT minting requires a React or Vite DApp frontend.<br>
+<div class="zn-box">
+Note:
+Full on-chain wallet connect/POAP/NFT minting requires a React or Vite DApp frontend.
+
 This Streamlit app provides cryptographic audit logging for proof-ready compliance analytics.
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
