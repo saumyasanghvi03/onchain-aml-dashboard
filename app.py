@@ -2,60 +2,53 @@ import streamlit as st
 import pandas as pd
 import requests
 import hashlib
-from datetime import datetime
+from datetime import datetime, date, time, timedelta
 import io
 import os
 import re
 
-# --- Token Mapping Dictionary (Ethereum only) ---
-# Maps token symbols to CoinGecko token IDs for Ethereum
+# --- Token Mapping Dictionary (Top 10 by Market Cap, for Ethereum/ERC-20 where applicable) ---
 TOKEN_MAPPING = {
-    'BTC': 'bitcoin',    # Wrapped BTC on Ethereum
-    'ETH': 'ethereum',   # Native ETH
-    'USDT': 'tether'     # USDT on Ethereum
+    'BTC': 'bitcoin',             # Wrapped BTC on Ethereum
+    'ETH': 'ethereum',            # Native ETH
+    'USDT': 'tether',             # USDT on Ethereum
+    'BNB': 'binancecoin',         # Wrapped BNB (rare on Ethereum, may show "not found" if not deployed)
+    'SOL': 'solana',              # Wrapped SOL (if any, very uncommon on Ethereum)
+    'XRP': 'ripple',              # Wrapped XRP (rare on Ethereum, CoinGecko may return null)
+    'USDC': 'usd-coin',           # USDC on Ethereum
+    'ADA': 'cardano',             # Wrapped ADA (rare on Ethereum, may not resolve)
+    'DOGE': 'dogecoin',           # Wrapped DOGE (rare on Ethereum, may not resolve)
+    'TON': 'the-open-network'     # Wrapped TON (rare, may not resolve)
 }
+
 
 # --- Utility Functions ---
 def validate_ethereum_address(address):
-    """Validate Ethereum wallet address format"""
     if not address or not isinstance(address, str):
         return False
-    # Remove whitespace
     address = address.strip()
-    # Check if it's a valid Ethereum address (0x followed by 40 hex characters)
     return bool(re.match(r'^0x[a-fA-F0-9]{40}$', address))
 
 def validate_symbols_input(symbols_input):
-    """Validate and clean crypto symbols input"""
     if not symbols_input or not isinstance(symbols_input, str):
         return []
-    
-    # Split by comma and clean up
     symbols = [s.strip().upper() for s in symbols_input.split(',') if s.strip()]
     return symbols
 
 def get_crypto_price(token_id, api_key=None):
-    """Fetch price from CoinGecko with proper error handling"""
     try:
         base_url = "https://api.coingecko.com/api/v3/simple/price"
-        params = {
-            'ids': token_id,
-            'vs_currencies': 'usd'
-        }
-        
+        params = {'ids': token_id, 'vs_currencies': 'usd'}
         headers = {}
         if api_key:
             headers['x-cg-demo-api-key'] = api_key
-        
         response = requests.get(base_url, params=params, headers=headers, timeout=10)
         response.raise_for_status()
-        
         data = response.json()
         if token_id in data and 'usd' in data[token_id]:
             return data[token_id]['usd']
         else:
             return None
-            
     except requests.exceptions.RequestException as e:
         st.error(f"API request failed for {token_id}: {str(e)}")
         return None
@@ -64,7 +57,6 @@ def get_crypto_price(token_id, api_key=None):
         return None
 
 def create_audit_hash(wallet, token, coingecko_id, price, timestamp, breach):
-    """Create cryptographic hash for audit trail"""
     try:
         audit_string = f"{wallet}|{token}|{coingecko_id}|{price}|{timestamp}|{breach}|finAIguard"
         return hashlib.sha256(audit_string.encode()).hexdigest()[:16]
@@ -78,29 +70,25 @@ st.markdown("Real-time Ethereum compliance monitoring with cryptographic audit t
 
 # --- Sidebar Configuration ---
 st.sidebar.markdown("### Configuration")
-
 wallets_input = st.sidebar.text_area(
     "Wallet Addresses (one per line)",
     "0x742d35Cc6634C0532925a3b8D7389A6dCfc3A6F3\n0x8BA1F109551bD432803012645Hac136c0c7b908\n0x1F916BF5c16eE52c9E79E42A60dBd0b1A1C26A2E",
     height=120,
     help="Enter Ethereum wallet addresses, one per line. Each address should start with 0x followed by 40 hex characters."
 )
-
 crypto_symbols = st.sidebar.text_input(
     "Crypto Symbols (comma-separated)",
     "BTC,ETH,USDT",
     help="Enter cryptocurrency symbols separated by commas. Only tokens supported on Ethereum are available."
 )
-
 api_key = st.sidebar.text_input(
     "CoinGecko API Key (optional)",
     type="password",
     help="For higher rate limits"
 )
-
-etherscan_api_key_input = st.sidebar.text_input(
+etherscan_api_key = st.sidebar.text_input(
     "Etherscan API Key (optional)",
-    value="",  # leave blank for user entry
+    value="",
     type="password",
     help="Your Etherscan API key for historical wallet activity analysis."
 )
@@ -112,88 +100,61 @@ with st.expander("ℹ️ Supported Tokens on Ethereum"):
         st.markdown(f"- **{symbol}** ({token_id})")
     st.markdown("\n*Note: This app focuses on Ethereum-based tokens for compliance monitoring.*")
 
-# --- Input Validation and Processing ---
+# --- Compliance Price Check Logic ---
 if st.sidebar.button("🚀 Run Compliance Check", type="primary"):
-    # Input validation
     validation_errors = []
-    
-    # Validate wallet addresses
     if not wallets_input or not wallets_input.strip():
         validation_errors.append("Please provide at least one wallet address")
     else:
         wallet_list = [addr.strip() for addr in wallets_input.strip().split('\n') if addr.strip()]
         invalid_wallets = [addr for addr in wallet_list if not validate_ethereum_address(addr)]
-        
         if invalid_wallets:
             validation_errors.append(f"Invalid wallet address(es): {', '.join(invalid_wallets[:3])}{'...' if len(invalid_wallets) > 3 else ''}")
-        
         if not wallet_list:
             validation_errors.append("No valid wallet addresses found")
-    
-    # Validate symbols
     if not crypto_symbols or not crypto_symbols.strip():
         validation_errors.append("Please provide at least one crypto symbol")
     else:
         symbols = validate_symbols_input(crypto_symbols)
         if not symbols:
             validation_errors.append("No valid crypto symbols found")
-    
-    # Display validation errors
     if validation_errors:
         for error in validation_errors:
             st.error(f"❌ Validation Error: {error}")
         st.info("Please correct the above errors and try again.")
     else:
-        # Process valid inputs
         try:
             wallet_list = [addr.strip() for addr in wallets_input.strip().split('\n') if addr.strip()]
             symbols = validate_symbols_input(crypto_symbols)
-            
-            # Filter supported tokens
             supported_tokens = [symbol for symbol in symbols if symbol in TOKEN_MAPPING]
             unsupported_tokens = [symbol for symbol in symbols if symbol not in TOKEN_MAPPING]
-            
-            # Show warnings for unsupported tokens
             if unsupported_tokens:
                 st.warning(f"⚠️ Unsupported tokens (skipped): {', '.join(unsupported_tokens)}")
-            
             if not supported_tokens:
                 st.error("❌ No supported tokens found. Please check the supported tokens list above.")
             else:
-                # Processing indicators
                 progress_bar = st.progress(0)
                 status_text = st.empty()
-                
                 audit_data = []
                 successful_tokens = []
                 failed_tokens = []
-                
                 total_operations = len(wallet_list) * len(supported_tokens)
                 current_operation = 0
-                
-                # Process each wallet-token combination
                 for wallet in wallet_list:
                     for symbol in supported_tokens:
                         current_operation += 1
                         progress = current_operation / total_operations
                         progress_bar.progress(progress)
                         status_text.text(f"Processing {symbol} for wallet {wallet[:10]}...")
-                        
                         try:
                             token_id = TOKEN_MAPPING[symbol]
                             price = get_crypto_price(token_id, api_key)
-                            
                             if price is not None:
                                 timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                
-                                # Simple compliance check (price > $1000 = breach)
                                 compliance_breach = 1 if price > 1000 else 0
-                                
-                                # Create audit hash
                                 audit_hash = create_audit_hash(
                                     wallet, symbol, token_id, price, timestamp, compliance_breach
                                 )
-                                
                                 audit_data.append({
                                     'timestamp_utc': timestamp,
                                     'wallet': wallet,
@@ -203,37 +164,25 @@ if st.sidebar.button("🚀 Run Compliance Check", type="primary"):
                                     'compliance_breach': compliance_breach,
                                     'audit_hash': audit_hash
                                 })
-                                
                                 if symbol not in successful_tokens:
                                     successful_tokens.append(symbol)
                             else:
                                 if symbol not in failed_tokens:
                                     failed_tokens.append(symbol)
-                                    
                         except Exception as e:
                             st.error(f"Error processing {symbol} for {wallet}: {str(e)}")
                             if symbol not in failed_tokens:
                                 failed_tokens.append(symbol)
-                
-                # Clear progress indicators
                 progress_bar.empty()
                 status_text.empty()
-                
-                # Show processing results
                 if failed_tokens:
                     st.warning(f"⚠️ Failed to fetch data for: {', '.join(failed_tokens)}")
-                
                 if successful_tokens:
                     st.success(f"✅ Successfully processed: {', '.join(successful_tokens)}")
-                
-                # Display results
                 if audit_data:
                     try:
                         df = pd.DataFrame(audit_data)
-                        
                         st.markdown("### 📊 Compliance Dashboard")
-                        
-                        # Metrics
                         col1, col2, col3 = st.columns(3)
                         with col1:
                             st.metric("Total Checks", len(df))
@@ -242,14 +191,10 @@ if st.sidebar.button("🚀 Run Compliance Check", type="primary"):
                         with col3:
                             breaches = df['compliance_breach'].sum()
                             st.metric("Breaches", breaches, delta=f"{breaches} alerts")
-                        
-                        # Display dataframe
                         st.dataframe(
                             df[['timestamp_utc', 'wallet', 'token', 'coingecko_id', 'current_price', 'compliance_breach', 'audit_hash']], 
                             use_container_width=True
                         )
-                        
-                        # Download button (only enabled when results exist)
                         try:
                             buf = io.StringIO()
                             df.to_csv(buf, index=False)
@@ -262,19 +207,15 @@ if st.sidebar.button("🚀 Run Compliance Check", type="primary"):
                             )
                         except Exception as e:
                             st.error(f"Error preparing download: {str(e)}")
-                        
-                        # Enhanced transparency explanation
                         st.markdown(
                             "### 🔐 Audit Trail Transparency\n\n"
                             "The audit hash is computed over: `wallet|token|coingecko_id|price|timestamp|breach|finAIguard`\n\n"
                             "This hash includes the specific CoinGecko token ID used for Ethereum tokens, "
                             "ensuring full traceability of price sources. All data can be verified from the CSV log!"
                         )
-                        
                     except Exception as e:
                         st.error(f"Error creating results dataframe: {str(e)}")
                         st.info("Please try again or contact support if the issue persists.")
-                        
                 else:
                     if not supported_tokens:
                         st.error("❌ No supported tokens found for Ethereum. Please check the supported tokens above.")
@@ -284,15 +225,11 @@ if st.sidebar.button("🚀 Run Compliance Check", type="primary"):
                     else:
                         st.error("❌ No results generated. This could be due to API errors or network issues.")
                         st.info("Please try again in a few moments.")
-                        
         except Exception as e:
             st.error(f"❌ Unexpected error during processing: {str(e)}")
             st.info("Please refresh the page and try again. If the issue persists, contact support.")
 else:
-    # Default state - no action taken yet
     st.info("👆 Configure your wallet addresses and crypto symbols in the sidebar, then click 'Run Compliance Check' to begin.")
-    
-    # Show example of what the dashboard looks like
     with st.expander("📋 Preview: Dashboard Output"):
         st.markdown("When you run a compliance check, you'll see:")
         st.markdown("- 📊 **Metrics**: Total checks, wallets analyzed, compliance breaches")
@@ -301,20 +238,17 @@ else:
         st.markdown("- 🔐 **Transparency**: Cryptographic verification details")
 
 # --- Period-based Ethereum Wallet Activity Analysis (Etherscan powered) ---
-import datetime
-
 st.sidebar.subheader("Activity Analysis Period")
-start_date = st.sidebar.date_input("Start date", datetime.date.today() - datetime.timedelta(days=7))
-end_date = st.sidebar.date_input("End date", datetime.date.today())
+start_date = st.sidebar.date_input("Start date", date.today() - timedelta(days=7))
+end_date = st.sidebar.date_input("End date", date.today())
 activity_run = st.sidebar.button("🚀 Run Wallet Activity Analysis")
 
-ETHERSCAN_API_KEY = etherscan_api_key_input
-
-def fetch_eth_transactions(address):
+def fetch_eth_transactions(address, etherscan_api_key=None):
+    api_key = etherscan_api_key or "VWJEDM7IYQZTX4KKDY45NSDT3IWB1PTJI5"
     url = (
         f"https://api.etherscan.io/api?module=account&action=txlist"
         f"&address={address}&startblock=0&endblock=99999999&sort=asc"
-        f"&apikey={ETHERSCAN_API_KEY}"
+        f"&apikey={api_key}"
     )
     try:
         r = requests.get(url, timeout=12)
@@ -327,19 +261,15 @@ def fetch_eth_transactions(address):
         return []
 
 def summarize_activity(txlist, start, end, large_amt=2.0):
-    start_ts = int(datetime.datetime.combine(start, datetime.time.min).timestamp())
-    end_ts = int(datetime.datetime.combine(end, datetime.time.max).timestamp())
+    start_ts = int(datetime.combine(start, time.min).timestamp())
+    end_ts = int(datetime.combine(end, time.max).timestamp())
     filtered = [tx for tx in txlist if start_ts <= int(tx["timeStamp"]) <= end_ts]
-    sent = 0.0
-    received = 0.0
-    large = []
+    sent, received, large = 0.0, 0.0, []
     for tx in filtered:
         eth = float(tx["value"]) / 1e18
-        # Consider tx direction
+        # Define direction as received if tx["to"] == current wallet, otherwise sent
         if eth >= large_amt:
             large.append(tx)
-        # Simplistic: all txs with 'to' field as receive, real use should aggregate sent/recv using input address as 'from' or 'to'
-        # Here, we demo received only (API does not distinguish direction per user directly, advanced users can customize)
         received += eth
     return {
         "count": len(filtered),
@@ -353,7 +283,7 @@ if activity_run:
     wallets = [w.strip() for w in wallets_input.strip().split('\n') if w.strip()]
     for wallet in wallets:
         st.subheader(f"Activity for {wallet}")
-        txlist = fetch_eth_transactions(wallet)
+        txlist = fetch_eth_transactions(wallet, etherscan_api_key)
         summ = summarize_activity(txlist, start_date, end_date)
         st.metric("Tx Count (period)", summ["count"])
         st.metric("Total Received (ETH)", f"{summ['received']:.4f}")
@@ -361,7 +291,7 @@ if activity_run:
         if summ["large_count"]:
             st.write("Large Transactions:")
             st.dataframe([
-                {"Hash": tx["hash"], "Time": datetime.datetime.fromtimestamp(int(tx["timeStamp"])),
+                {"Hash": tx["hash"], "Time": datetime.fromtimestamp(int(tx["timeStamp"])),
                  "From": tx["from"], "To": tx["to"],
                  "Value(ETH)": float(tx["value"]) / 1e18}
                 for tx in summ["large_txs"]
@@ -369,7 +299,7 @@ if activity_run:
         if summ["count"]:
             st.write("All Period Transactions:")
             st.dataframe([
-                {"Hash": tx["hash"], "Time": datetime.datetime.fromtimestamp(int(tx["timeStamp"])),
+                {"Hash": tx["hash"], "Time": datetime.fromtimestamp(int(tx["timeStamp"])),
                  "From": tx["from"], "To": tx["to"],
                  "Value(ETH)": float(tx["value"]) / 1e18}
                 for tx in summ["all_txs"]
