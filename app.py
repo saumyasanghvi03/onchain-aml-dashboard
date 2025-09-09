@@ -6,6 +6,30 @@ from datetime import datetime
 import io
 import os
 
+# --- Token-Chain Mapping Dictionary ---
+# Maps (chain, symbol) to CoinGecko token ID for accurate price fetching
+TOKEN_CHAIN_MAPPING = {
+    # Bitcoin (BTC)
+    ('Bitcoin', 'BTC'): 'bitcoin',
+    ('Ethereum', 'BTC'): 'bitcoin',  # Wrapped BTC on Ethereum
+    ('Binance Smart Chain (BSC)', 'BTC'): 'bitcoin',  # Wrapped BTC on BSC
+    ('Polygon', 'BTC'): 'bitcoin',  # Wrapped BTC on Polygon
+    
+    # Ethereum (ETH)
+    ('Ethereum', 'ETH'): 'ethereum',
+    ('Binance Smart Chain (BSC)', 'ETH'): 'ethereum',  # Wrapped ETH on BSC
+    ('Polygon', 'ETH'): 'ethereum',  # Wrapped ETH on Polygon
+    
+    # USDT
+    ('Ethereum', 'USDT'): 'tether',
+    ('Binance Smart Chain (BSC)', 'USDT'): 'tether',
+    ('Polygon', 'USDT'): 'tether',
+    ('Bitcoin', 'USDT'): 'tether',  # USDT on Bitcoin (Omni/Liquid)
+}
+
+# Supported combinations for clear user feedback
+SUPPORTED_COMBINATIONS = set(TOKEN_CHAIN_MAPPING.keys())
+
 # --- CSS Styles in Single Block ---
 st.markdown(
 """.bigfont {
@@ -38,6 +62,24 @@ st.markdown(
     border-radius: 1em;
     font-size: 1.11em;
     font-weight: 600;
+}
+.warning-box {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+    padding: 0.75em 1em;
+    margin-bottom: 1em;
+    border-radius: 0.5em;
+    font-size: 0.95em;
+}
+.success-box {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+    padding: 0.75em 1em;
+    margin-bottom: 1em;
+    border-radius: 0.5em;
+    font-size: 0.95em;
 }""", unsafe_allow_html=True)
 
 # --- Title & Description ---
@@ -73,6 +115,20 @@ api_key = st.sidebar.text_input(
     help="For higher rate limits"
 )
 
+# --- Display Supported Combinations ---
+with st.expander("ℹ️ Supported Token-Chain Combinations"):
+    st.markdown("**Currently supported combinations:**")
+    supported_display = {}
+    for (chain, symbol) in SUPPORTED_COMBINATIONS:
+        if chain not in supported_display:
+            supported_display[chain] = []
+        supported_display[chain].append(symbol)
+    
+    for chain, symbols in supported_display.items():
+        st.markdown(f"- **{chain}**: {', '.join(symbols)}")
+    
+    st.markdown("\n*Unsupported combinations will be skipped with clear warnings.*")
+
 # --- Main Content ---
 if st.button("🚀 Run Compliance Check", use_container_width=True):
     if not selected_chains:
@@ -82,17 +138,27 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
         symbol_list = [s.strip().upper() for s in crypto_symbols.split(',') if s.strip()]
         
         if wallet_list and symbol_list:
-            # Initialize results list
+            # Initialize results list and tracking
             results = []
+            skipped_combinations = []
+            successful_combinations = []
             
             with st.spinner("Running compliance checks..."):
                 # Nested loop for both symbols and chains
                 for symbol in symbol_list:
                     for chain in selected_chains:
-                        # Fetch crypto price from CoinGecko
+                        # Check if combination is supported
+                        if (chain, symbol) not in SUPPORTED_COMBINATIONS:
+                            skipped_combinations.append((chain, symbol))
+                            continue
+                        
+                        # Get the correct CoinGecko token ID
+                        coingecko_token_id = TOKEN_CHAIN_MAPPING[(chain, symbol)]
+                        
+                        # Fetch crypto price from CoinGecko using mapped token ID
                         url = "https://api.coingecko.com/api/v3/simple/price"
                         params = {
-                            'ids': symbol.lower() if symbol.lower() in ['bitcoin', 'ethereum'] else f'{symbol.lower()}-token',
+                            'ids': coingecko_token_id,
                             'vs_currencies': 'usd'
                         }
                         
@@ -103,22 +169,14 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
                             response = requests.get(url, params=params, timeout=10)
                             data = response.json()
                             
-                            # Handle different symbol formats
-                            price = None
-                            if symbol.lower() == 'btc' or symbol.lower() == 'bitcoin':
-                                price = data.get('bitcoin', {}).get('usd')
-                            elif symbol.lower() == 'eth' or symbol.lower() == 'ethereum':
-                                price = data.get('ethereum', {}).get('usd')
-                            else:
-                                # Try various token formats
-                                for key in data.keys():
-                                    if key.startswith(symbol.lower()):
-                                        price = data[key].get('usd')
-                                        break
+                            # Extract price using the mapped token ID
+                            price = data.get(coingecko_token_id, {}).get('usd')
                             
                             if price is None:
-                                st.warning(f"Could not fetch price for {symbol} on {chain}")
+                                st.warning(f"Could not fetch price for {symbol} on {chain} (token_id: {coingecko_token_id})")
                                 continue
+                            
+                            successful_combinations.append((chain, symbol, price))
                                 
                         except Exception as e:
                             st.error(f"API error for {symbol} on {chain}: {str(e)}")
@@ -128,11 +186,19 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
                         for wallet in wallet_list:
                             timestamp = datetime.utcnow().isoformat()
                             
-                            # Simple compliance check (price-based)
-                            compliance_breach = price > 50000 if symbol.upper() in ['BTC', 'BITCOIN'] else price > 3000
+                            # Enhanced compliance check (price-based with chain awareness)
+                            if symbol.upper() == 'BTC':
+                                compliance_breach = price > 50000
+                            elif symbol.upper() == 'ETH':
+                                compliance_breach = price > 3000
+                            elif symbol.upper() == 'USDT':
+                                # USDT should stay close to $1, flag if deviation > 5%
+                                compliance_breach = abs(price - 1.0) > 0.05
+                            else:
+                                compliance_breach = False  # Default for unknown tokens
                             
-                            # Create audit hash
-                            audit_string = f"{wallet}|{symbol}|{chain}|{price}|{timestamp}|{compliance_breach}|finAIguard"
+                            # Create audit hash with chain-specific information
+                            audit_string = f"{wallet}|{symbol}|{chain}|{coingecko_token_id}|{price}|{timestamp}|{compliance_breach}|finAIguard"
                             audit_hash = hashlib.sha256(audit_string.encode()).hexdigest()[:16]
                             
                             results.append({
@@ -140,10 +206,27 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
                                 'wallet': wallet,
                                 'token': symbol,
                                 'chain': chain,
+                                'coingecko_id': coingecko_token_id,
                                 'current_price': price,
                                 'compliance_breach': compliance_breach,
                                 'audit_hash': audit_hash
                             })
+            
+            # Display warnings for skipped combinations
+            if skipped_combinations:
+                st.markdown('<div class="warning-box">', unsafe_allow_html=True)
+                st.markdown("**⚠️ Skipped Unsupported Combinations:**")
+                for chain, symbol in skipped_combinations:
+                    st.markdown(f"• {symbol} on {chain} - not currently supported")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Display successful combinations
+            if successful_combinations:
+                st.markdown('<div class="success-box">', unsafe_allow_html=True)
+                st.markdown("**✅ Successfully Processed Combinations:**")
+                for chain, symbol, price in successful_combinations:
+                    st.markdown(f"• {symbol} on {chain}: ${price:,.4f}")
+                st.markdown('</div>', unsafe_allow_html=True)
             
             if results:
                 df = pd.DataFrame(results)
@@ -157,14 +240,14 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
                 with col2:
                     st.metric("Wallets", len(wallet_list))
                 with col3:
-                    st.metric("Chains", len(selected_chains))
+                    st.metric("Supported Chains", len([c for c in selected_chains if any((c, s) in SUPPORTED_COMBINATIONS for s in symbol_list)]))
                 with col4:
                     breaches = df['compliance_breach'].sum()
                     st.metric("Breaches", breaches, delta=f"{breaches} alerts")
                 
-                # Display dataframe
+                # Display dataframe with enhanced columns
                 st.dataframe(
-                    df[['timestamp_utc', 'wallet', 'token', 'chain', 'current_price', 'compliance_breach', 'audit_hash']], 
+                    df[['timestamp_utc', 'wallet', 'token', 'chain', 'coingecko_id', 'current_price', 'compliance_breach', 'audit_hash']], 
                     use_container_width=True
                 )
                 
@@ -178,23 +261,28 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
                     mime="text/csv"
                 )
                 
-                # Transparency explanation
+                # Enhanced transparency explanation
                 st.markdown(
 """
                 <div class="zn-box" style="background:#fffaed;font-size:1em;">
-                For full transparency:
-                <br><br>
-                The audit hash above is computed over:
-                <br><br>
+                <strong>🔐 Audit Trail Transparency:</strong><br/><br/>
+                
+                The audit hash is computed over:<br/><br/>
+                
                 <span style="background:#fff8c0;padding:0.13em 0.45em 0.13em 0.45em;border-radius:1em;font-family:monospace;">
-                wallet|token|chain|price|timestamp|breach|finAIguard
-                </span>
-                <br><br>
-                and can be verified by anyone from the CSV log!
+                wallet|token|chain|coingecko_id|price|timestamp|breach|finAIguard
+                </span><br/><br/>
+                
+                This enhanced hash includes the specific CoinGecko token ID used for each chain,
+                ensuring full traceability of price sources and chain-specific token mappings.
+                All data can be verified from the CSV log!
                 </div>
                 """, unsafe_allow_html=True)
             else:
-                st.error("No results (bad API or symbol typo)!")
+                if skipped_combinations and not successful_combinations:
+                    st.error("No supported token-chain combinations found. Please check the supported combinations above.")
+                else:
+                    st.error("No results generated - API errors or invalid symbols.")
         else:
             st.error("Please provide both wallet addresses and crypto symbols.")
 
@@ -202,8 +290,6 @@ if st.button("🚀 Run Compliance Check", use_container_width=True):
 st.markdown("---")
 st.markdown(
 """<div class="zn-box">Note:
-
 Full on-chain wallet connect/POAP/NFT minting requires a React or Vite DApp frontend.
-
-This Streamlit app provides cryptographic audit logging for proof-ready compliance analytics.</div>""", unsafe_allow_html=True
+This Streamlit app provides cryptographic audit logging for proof-ready compliance analytics with robust multi-chain token support.</div>""", unsafe_allow_html=True
 )
